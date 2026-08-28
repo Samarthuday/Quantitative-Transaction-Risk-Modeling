@@ -27,6 +27,21 @@ def threshold_for_alert_rate(
     )
 
 
+def top_k_alert_mask(probabilities, alert_rate=0.005):
+    probabilities = np.asarray(probabilities, dtype=float)
+    if probabilities.ndim != 1 or len(probabilities) == 0:
+        raise ValueError("probabilities must be a non-empty one-dimensional array.")
+    if not 0 < alert_rate <= 1:
+        raise ValueError("alert_rate must be in (0, 1].")
+
+    alert_count = max(1, int(np.ceil(len(probabilities) * alert_rate)))
+    order = np.argsort(-probabilities, kind="stable")
+    selected = order[:alert_count]
+    mask = np.zeros(len(probabilities), dtype=bool)
+    mask[selected] = True
+    return mask
+
+
 def precision_recall_at_alert_rate(
     y_true,
     probabilities,
@@ -35,12 +50,8 @@ def precision_recall_at_alert_rate(
     y_true = np.asarray(y_true)
     probabilities = np.asarray(probabilities)
 
-    threshold = threshold_for_alert_rate(
-        probabilities,
-        alert_rate,
-    )
-
-    predicted = probabilities >= threshold
+    predicted = top_k_alert_mask(probabilities, alert_rate)
+    threshold = float(probabilities[predicted].min())
 
     tp = np.sum(
         (predicted == 1) &

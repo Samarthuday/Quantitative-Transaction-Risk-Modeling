@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import xgboost as xgb
 from sklearn.compose import ColumnTransformer
@@ -26,6 +25,41 @@ def chronological_split(
     test = df.iloc[validation_end:].copy()
 
     return train, validation, test
+
+
+def temporal_split(
+    df: pd.DataFrame,
+    train_fraction: float = 0.65,
+    calibration_fraction: float = 0.10,
+    validation_fraction: float = 0.10,
+):
+    ordered = df.sort_values("timestamp").reset_index(drop=True)
+    if train_fraction <= 0 or calibration_fraction <= 0 or validation_fraction <= 0:
+        raise ValueError("split fractions must be positive.")
+    if train_fraction + calibration_fraction + validation_fraction >= 1:
+        raise ValueError("split fractions must leave observations for test data.")
+
+    timestamps = ordered["timestamp"].drop_duplicates().sort_values().to_numpy()
+    timestamp_count = len(timestamps)
+    train_end = max(1, int(timestamp_count * train_fraction))
+    calibration_end = max(train_end + 1, int(timestamp_count * (train_fraction + calibration_fraction)))
+    validation_end = max(calibration_end + 1, int(timestamp_count * (train_fraction + calibration_fraction + validation_fraction)))
+    if validation_end >= timestamp_count:
+        raise ValueError("not enough distinct timestamps for four temporal periods.")
+
+    boundaries = timestamps[[train_end, calibration_end, validation_end]]
+    train = ordered[ordered["timestamp"] < boundaries[0]].copy()
+    calibration = ordered[
+        (ordered["timestamp"] >= boundaries[0])
+        & (ordered["timestamp"] < boundaries[1])
+    ].copy()
+    validation = ordered[
+        (ordered["timestamp"] >= boundaries[1])
+        & (ordered["timestamp"] < boundaries[2])
+    ].copy()
+    test = ordered[ordered["timestamp"] >= boundaries[2]].copy()
+
+    return train, calibration, validation, test
 
 TARGET = "Is_laundering"
 
@@ -175,7 +209,7 @@ def build_preprocessor(feature_names=MODEL_FEATURES):
     )
 
 
-def build_xgboost_model(y_train):
+def build_xgboost_model(y_train, fast=False):
     positives = int(y_train.sum())
     negatives = len(y_train) - positives
 
@@ -188,7 +222,7 @@ def build_xgboost_model(y_train):
 
     return xgb.XGBClassifier(
         objective="binary:logistic",
-        n_estimators=500,
+        n_estimators=10 if fast else 500,
         max_depth=5,
         learning_rate=0.05,
         subsample=0.8,
@@ -204,7 +238,7 @@ def build_xgboost_model(y_train):
     )
 
 
-def fit_model(train, validation, feature_names=MODEL_FEATURES):
+def fit_model(train, validation, feature_names=MODEL_FEATURES, fast=False):
     X_train = train[feature_names]
     y_train = train[TARGET]
 
@@ -216,7 +250,7 @@ def fit_model(train, validation, feature_names=MODEL_FEATURES):
     X_train_processed = preprocessor.fit_transform(X_train)
     X_validation_processed = preprocessor.transform(X_validation)
 
-    model = build_xgboost_model(y_train)
+    model = build_xgboost_model(y_train, fast=fast)
     model.fit(
         X_train_processed,
         y_train,

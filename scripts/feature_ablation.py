@@ -1,3 +1,5 @@
+import argparse
+import csv
 import sys
 from pathlib import Path
 
@@ -14,21 +16,21 @@ from src.models.calibration import ProbabilityCalibrator
 from src.models.train import (
     ABLATION_FEATURE_SETS,
     TARGET,
-    chronological_split,
     fit_model,
+    temporal_split,
 )
 
 FEATURE_PATH = PROJECT_ROOT / "data/processed/transactions_features.parquet"
 ALERT_RATE = 0.005
 
 
-def evaluate_feature_set(name, features, train, validation, test):
+def evaluate_feature_set(name, features, train, calibration, validation, test, fast=False):
     (
         preprocessor,
         model,
         X_validation_processed,
         y_validation,
-    ) = fit_model(train, validation, features)
+    ) = fit_model(train, calibration, features, fast=fast)
 
     validation_probabilities = model.predict_proba(
         X_validation_processed
@@ -63,16 +65,24 @@ def evaluate_feature_set(name, features, train, validation, test):
 
 
 def main():
-    df = pd.read_parquet(FEATURE_PATH)
-    train, validation, test = chronological_split(df)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--features", type=Path, default=FEATURE_PATH)
+    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "reports/ablation_results.csv")
+    parser.add_argument("--fast", action="store_true")
+    args = parser.parse_args()
+
+    df = pd.read_parquet(args.features)
+    train, calibration, validation, test = temporal_split(df)
 
     results = [
         evaluate_feature_set(
             name,
             features,
             train,
+            calibration,
             validation,
             test,
+            args.fast,
         )
         for name, features in ABLATION_FEATURE_SETS.items()
     ]
@@ -87,6 +97,12 @@ def main():
             f"{result['pr_auc']:>12.6f} "
             f"{result['recall_at_0.5%']:>16.6f}"
         )
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=results[0].keys())
+        writer.writeheader()
+        writer.writerows(results)
 
 
 if __name__ == "__main__":
