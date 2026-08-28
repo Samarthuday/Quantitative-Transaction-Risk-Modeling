@@ -4,7 +4,7 @@
 
 ### A research-oriented framework for rare-event financial transaction surveillance using temporal, behavioral, and network signals.
 
-**Python · XGBoost · scikit-learn · DuckDB · SHAP · Flask**
+**Python · XGBoost · scikit-learn · DuckDB · SHAP · FastAPI**
 
 </div>
 

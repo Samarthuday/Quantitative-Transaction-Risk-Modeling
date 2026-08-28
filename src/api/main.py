@@ -22,8 +22,8 @@ from src.api.models import (
 )
 from src.api.results_loader import (
     get_ablation_results,
-    get_typology_results,
     get_all_figures,
+    get_typology_results,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

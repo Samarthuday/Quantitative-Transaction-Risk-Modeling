@@ -1,6 +1,6 @@
 """Model drift and data distribution monitoring."""
 
-from typing import Dict, Optional, List
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
