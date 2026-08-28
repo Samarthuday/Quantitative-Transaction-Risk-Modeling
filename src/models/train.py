@@ -57,13 +57,12 @@ NUMERIC_FEATURES = [
     "receiver_txn_count_24h",
     "receiver_amount_sum_24h",
 
-    "sender_receiver_prior_count",
     "seconds_since_sender_txn",
 
+    "sender_txn_count_lifetime",
+    "receiver_txn_count_lifetime",
     "sender_out_degree",
     "receiver_in_degree",
-    "sender_unique_counterparties",
-    "receiver_unique_counterparties",
     "pair_transaction_count",
     "sender_counterparty_hhi",
 ]
@@ -104,15 +103,14 @@ BEHAVIORAL_FEATURES = [
     "sender_amount_zscore",
     "receiver_txn_count_24h",
     "receiver_amount_sum_24h",
-    "sender_receiver_prior_count",
     "seconds_since_sender_txn",
 ]
 
 NETWORK_FEATURES = [
+    "sender_txn_count_lifetime",
+    "receiver_txn_count_lifetime",
     "sender_out_degree",
     "receiver_in_degree",
-    "sender_unique_counterparties",
-    "receiver_unique_counterparties",
     "pair_transaction_count",
     "sender_counterparty_hhi",
 ]
