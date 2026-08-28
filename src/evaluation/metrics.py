@@ -1,3 +1,7 @@
+"""Evaluation metrics for risk models."""
+
+from typing import Dict, Union
+
 import numpy as np
 from sklearn.metrics import (
     average_precision_score,
@@ -8,9 +12,9 @@ from sklearn.metrics import (
 
 
 def threshold_for_alert_rate(
-    probabilities,
-    alert_rate=0.005,
-):
+    probabilities: Union[np.ndarray, list],
+    alert_rate: float = 0.005,
+) -> float:
     """
     Alert only the top X% highest-risk transactions.
     """
@@ -27,20 +31,35 @@ def threshold_for_alert_rate(
     )
 
 
+def top_k_alert_mask(
+    probabilities: Union[np.ndarray, list],
+    alert_rate: float = 0.005,
+) -> np.ndarray:
+    """Select top-K transactions based on alert rate."""
+    probabilities = np.asarray(probabilities, dtype=float)
+    if probabilities.ndim != 1 or len(probabilities) == 0:
+        raise ValueError("probabilities must be a non-empty one-dimensional array.")
+    if not 0 < alert_rate <= 1:
+        raise ValueError("alert_rate must be in (0, 1].")
+
+    alert_count = max(1, int(np.ceil(len(probabilities) * alert_rate)))
+    order = np.argsort(-probabilities, kind="stable")
+    selected = order[:alert_count]
+    mask = np.zeros(len(probabilities), dtype=bool)
+    mask[selected] = True
+    return mask
+
+
 def precision_recall_at_alert_rate(
-    y_true,
-    probabilities,
-    alert_rate=0.005,
-):
+    y_true: Union[np.ndarray, list],
+    probabilities: Union[np.ndarray, list],
+    alert_rate: float = 0.005,
+) -> Dict[str, float]:
     y_true = np.asarray(y_true)
     probabilities = np.asarray(probabilities)
 
-    threshold = threshold_for_alert_rate(
-        probabilities,
-        alert_rate,
-    )
-
-    predicted = probabilities >= threshold
+    predicted = top_k_alert_mask(probabilities, alert_rate)
+    threshold = float(probabilities[predicted].min())
 
     tp = np.sum(
         (predicted == 1) &
@@ -88,12 +107,12 @@ def precision_recall_at_alert_rate(
 
 
 def expected_decision_cost(
-    y_true,
-    probabilities,
-    threshold,
-    false_negative_cost=100,
-    false_positive_cost=1,
-):
+    y_true: Union[np.ndarray, list],
+    probabilities: Union[np.ndarray, list],
+    threshold: float,
+    false_negative_cost: float = 100,
+    false_positive_cost: float = 1,
+) -> float:
     """Return the operational cost induced by a binary alert threshold."""
 
     y_true = np.asarray(y_true)
@@ -108,9 +127,9 @@ def expected_decision_cost(
     )
 
 def calculate_risk_weighted_exposure(
-    amounts,
-    probabilities,
-):
+    amounts: Union[np.ndarray, list],
+    probabilities: Union[np.ndarray, list],
+) -> np.ndarray:
     """
     Probability-weighted transaction amount.
 
@@ -125,9 +144,9 @@ def calculate_risk_weighted_exposure(
 
 
 def evaluate_model(
-    y_true,
-    probabilities,
-):
+    y_true: Union[np.ndarray, list],
+    probabilities: Union[np.ndarray, list],
+) -> Dict[str, float]:
 
     y_true = np.asarray(y_true)
     if np.unique(y_true).size < 2:

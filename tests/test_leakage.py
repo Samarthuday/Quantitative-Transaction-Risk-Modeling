@@ -1,8 +1,8 @@
 import pandas as pd
 
+from src.evaluation.metrics import top_k_alert_mask
 from src.features.behavioral_features import add_behavioral_features
-from src.models.train import MODEL_FEATURES, chronological_split
-
+from src.models.train import MODEL_FEATURES, chronological_split, temporal_split
 
 FORBIDDEN_FEATURES = {
     "Is_laundering",
@@ -83,3 +83,40 @@ def test_amount_history_is_currency_aware():
     assert result.loc[1, "sender_amount_sum_24h"] == 0
     assert result.loc[1, "sender_amount_mean_30d"] == 0
     assert result.loc[1, "sender_counterparty_hhi"] == 0
+
+
+def test_alert_budget_selects_exact_top_k_on_ties():
+    mask = top_k_alert_mask([0.9, 0.5, 0.5, 0.1], alert_rate=0.5)
+
+    assert mask.tolist() == [True, True, False, False]
+
+
+def test_temporal_split_keeps_timestamp_groups_together():
+    frame = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(
+                [
+                    "2026-01-01",
+                    "2026-01-01",
+                    "2026-01-02",
+                    "2026-01-03",
+                    "2026-01-04",
+                    "2026-01-05",
+                    "2026-01-06",
+                    "2026-01-07",
+                    "2026-01-08",
+                    "2026-01-09",
+                ]
+            ),
+            "value": range(10),
+        }
+    )
+
+    train, calibration, validation, test = temporal_split(frame)
+
+    periods = [train, calibration, validation, test]
+    assert all(not period.empty for period in periods)
+    assert all(
+        left["timestamp"].max() < right["timestamp"].min()
+        for left, right in zip(periods, periods[1:])
+    )

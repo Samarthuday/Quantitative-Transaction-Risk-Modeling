@@ -4,9 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantitative-transaction-risk-modeling"
-version = "2.0.0"
+version = "2.1.0"
 description = "Rare-event financial transaction risk modeling with temporal, behavioral, and network features."
 requires-python = ">=3.11"
+dependencies = [
+	"numpy>=1.26,<3.0",
+	"pandas>=2.2,<3.0",
+	"scikit-learn>=1.5,<2.0",
+	"xgboost>=2.1,<4.0",
+	"duckdb>=1.1,<2.0",
+	"pyarrow>=17,<22",
+	"joblib>=1.4,<2.0",
+	"matplotlib>=3.9,<4.0",
+	"shap>=0.46,<1.0",
+	"fastapi>=0.109,<1.0",
+	"uvicorn[standard]>=0.29,<1.0",
+	"pydantic>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+	"pytest>=8.0,<9.0",
+	"pytest-asyncio>=0.23,<1.0",
+	"httpx>=0.26,<1.0",
+	"ruff>=0.6,<1.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -17,3 +39,7 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]

@@ -1,3 +1,6 @@
+import argparse
+import csv
+import json
 import sys
 from importlib.metadata import version
 from pathlib import Path
@@ -5,24 +8,30 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.calibration import calibration_curve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config import get_config
+from src.logging_config import setup_logging
+
+logger = setup_logging(__name__)
+
 from src.evaluation.metrics import (
     evaluate_model,
-    threshold_for_alert_rate,
+    top_k_alert_mask,
 )
+from src.models.baseline import build_logistic_baseline
 from src.models.calibration import (
     ProbabilityCalibrator,
 )
 from src.models.train import (
     MODEL_FEATURES,
     TARGET,
-    chronological_split,
     fit_model,
+    temporal_split,
 )
-from src.models.baseline import build_logistic_baseline
 
 FEATURE_PATH = PROJECT_ROOT / "data/processed/transactions_features.parquet"
 ARTIFACT_PATH = PROJECT_ROOT / "artifacts/risk_model.joblib"
@@ -41,7 +50,7 @@ def print_split_stats(name, frame):
     positive = frame[TARGET].sum()
     prevalence = frame[TARGET].mean()
 
-    print(
+    logger.info(
         f"{name}: "
         f"{len(frame):,} rows | "
         f"{positive:,} suspicious | "
@@ -50,22 +59,37 @@ def print_split_stats(name, frame):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--features", type=Path, default=FEATURE_PATH)
+    parser.add_argument("--artifact", type=Path, default=ARTIFACT_PATH)
+    parser.add_argument("--fast", action="store_true")
+    args = parser.parse_args()
 
-    ARTIFACT_PATH.parent.mkdir(exist_ok=True)
+    args.artifact.parent.mkdir(parents=True, exist_ok=True)
 
-    print("Loading feature dataset...")
+    logger.info(f"Loading feature dataset from {args.features}...")
 
     df = pd.read_parquet(
-        FEATURE_PATH
+        args.features
     )
+    logger.info(f"Loaded {len(df):,} transactions with {df.shape[1]} features")
 
-    train, validation, test = (
-        chronological_split(df)
-    )
+    logger.info("Performing temporal split (65% train / 10% calibration / 10% validation / 15% test)...")
+    train, calibration, validation, test = temporal_split(df)
+
+    config = get_config(fast=args.fast)
+    if args.fast:
+        logger.info("Using FAST mode configuration")
+    logger.info(f"XGBoost config: n_estimators={config.xgboost.n_estimators}, max_depth={config.xgboost.max_depth}")
 
     print_split_stats(
         "TRAIN",
         train,
+    )
+
+    print_split_stats(
+        "CALIBRATION",
+        calibration,
     )
 
     print_split_stats(
@@ -85,14 +109,15 @@ def main():
         y_validation,
     ) = fit_model(
         train,
-        validation,
+        calibration,
+        config=config,
     )
 
     # ---------------------------
     # CALIBRATION
     # ---------------------------
 
-    raw_validation_prob = (
+    raw_calibration_prob = (
         model.predict_proba(
             X_validation_processed
         )[:, 1]
@@ -101,30 +126,64 @@ def main():
     calibrator = ProbabilityCalibrator()
 
     calibrator.fit(
-        raw_validation_prob,
+        raw_calibration_prob,
         y_validation,
     )
 
     calibrated_validation_prob = (
-        calibrator.predict(
-            raw_validation_prob
-        )
+        calibrator.predict(raw_calibration_prob)
     )
+
+    calibration_report = {
+        "raw_brier_score": float(
+            evaluate_model(y_validation, raw_calibration_prob)["brier_score"]
+        ),
+        "calibrated_brier_score": float(
+            evaluate_model(y_validation, calibrated_validation_prob)["brier_score"]
+        ),
+        "raw_log_loss": float(
+            evaluate_model(y_validation, raw_calibration_prob)["log_loss"]
+        ),
+        "calibrated_log_loss": float(
+            evaluate_model(y_validation, calibrated_validation_prob)["log_loss"]
+        ),
+    }
+    figure_dir = PROJECT_ROOT / "reports/figures"
+    figure_dir.mkdir(parents=True, exist_ok=True)
+    import matplotlib.pyplot as plt
+
+    figure, axis = plt.subplots(figsize=(6, 6))
+    for probabilities, label in (
+        (raw_calibration_prob, "Raw XGBoost"),
+        (calibrated_validation_prob, "Calibrated XGBoost"),
+    ):
+        observed, predicted = calibration_curve(
+            y_validation,
+            probabilities,
+            n_bins=10,
+            strategy="quantile",
+        )
+        axis.plot(predicted, observed, marker="o", label=label)
+    axis.plot([0, 1], [0, 1], linestyle="--", color="black", label="Perfect")
+    axis.set_xlabel("Mean predicted probability")
+    axis.set_ylabel("Observed frequency")
+    axis.set_title("Probability calibration")
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(figure_dir / "calibration_curve.png", dpi=150)
+    plt.close(figure)
 
     # Use a realistic operational alert capacity
     alert_rate = 0.005
 
-    threshold = (
-        threshold_for_alert_rate(
-            calibrated_validation_prob,
-            alert_rate,
-        )
+    calibration_alerts = top_k_alert_mask(
+        calibrated_validation_prob,
+        alert_rate,
     )
+    threshold = float(calibrated_validation_prob[calibration_alerts].min())
 
-    print(
-        f"\nThreshold for "
-        f"{alert_rate:.2%} alert rate: "
-        f"{threshold:.6f}"
+    logger.info(
+        f"Threshold for {alert_rate:.2%} alert rate: {threshold:.6f}"
     )
 
     # ---------------------------
@@ -157,25 +216,39 @@ def main():
         calibrated_test_prob,
     )
 
-    print("\nOUT-OF-TIME TEST RESULTS")
-    print("=" * 50)
+    typology_results = []
+    if "Laundering_type" in test:
+        alert_mask = top_k_alert_mask(calibrated_test_prob, alert_rate)
+        for typology, group in test.groupby("Laundering_type", dropna=False):
+            group_mask = group.index.isin(test.index[alert_mask])
+            positives = group[TARGET].sum()
+            typology_results.append(
+                {
+                    "typology": str(typology),
+                    "transactions": int(len(group)),
+                    "positives": int(positives),
+                    "recall_at_0.5%": float(
+                        group_mask[group[TARGET].to_numpy() == 1].mean()
+                        if positives
+                        else 0
+                    ),
+                }
+            )
+        typology_path = PROJECT_ROOT / "reports/typology_results.csv"
+        with typology_path.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=typology_results[0].keys())
+            writer.writeheader()
+            writer.writerows(typology_results)
+
+    logger.info("OUT-OF-TIME TEST RESULTS:")
 
     for key, value in metrics.items():
-
         if isinstance(value, float):
-            print(
-                f"{key:30s}: "
-                f"{value:.6f}"
-            )
-
+            logger.info(f"  {key:30s}: {value:.6f}")
         else:
-            print(
-                f"{key:30s}: "
-                f"{value}"
-            )
+            logger.info(f"  {key:30s}: {value}")
 
-    # Benchmark the nonlinear model against a scalable logistic classifier on
-    # the exact same chronological partitions and preprocessing contract.
+    logger.info("Training logistic baseline for comparison...")
     baseline = build_logistic_baseline()
     baseline.fit(preprocessor.transform(train[MODEL_FEATURES]), train[TARGET])
     baseline_validation_prob = baseline.predict_proba(
@@ -190,10 +263,9 @@ def main():
     )
     baseline_metrics = evaluate_model(y_test, baseline_test_prob)
 
-    print("\nLOGISTIC BASELINE TEST RESULTS")
-    print("=" * 50)
+    logger.info("LOGISTIC BASELINE TEST RESULTS:")
     for key in ("pr_auc", "alert_0.500%_recall", "alert_0.500%_lift"):
-        print(f"{key:30s}: {baseline_metrics[key]:.6f}")
+        logger.info(f"  {key:30s}: {baseline_metrics[key]:.6f}")
 
     # ---------------------------
     # SAVE
@@ -203,6 +275,7 @@ def main():
         "preprocessor": preprocessor,
         "model": model,
         "calibrator": calibrator,
+        "calibration_metrics": calibration_report,
 
         "features": MODEL_FEATURES,
 
@@ -229,18 +302,26 @@ def main():
         "model_parameters": model.get_params(),
         "package_versions": package_versions(),
 
-        "model_version": "2.0.0",
+        "model_version": "2.1.0",
     }
 
-    joblib.dump(
-        artifact,
-        ARTIFACT_PATH,
-    )
+    logger.info(f"Saving model artifact to {args.artifact}...")
+    joblib.dump(artifact, args.artifact)
+    logger.info(f"Model saved successfully")
 
-    print(
-        "\nSaved model to "
-        f"{ARTIFACT_PATH.relative_to(PROJECT_ROOT)}"
-    )
+    logger.info(f"Writing metrics report...")
+    report_path = PROJECT_ROOT / "reports/model_metrics.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report = {
+        "model_version": artifact["model_version"],
+        "test_metrics": metrics,
+        "baseline_test_metrics": baseline_metrics,
+        "training_prevalence": artifact["training_prevalence"],
+        "test_prevalence": artifact["test_prevalence"],
+        "calibration": calibration_report,
+    }
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    logger.info(f"Metrics report written to {report_path.relative_to(PROJECT_ROOT)}")
 
 
 if __name__ == "__main__":

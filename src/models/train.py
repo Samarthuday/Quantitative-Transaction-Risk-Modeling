@@ -1,10 +1,11 @@
-import numpy as np
 import pandas as pd
 import xgboost as xgb
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
+
+from src.config import TrainingConfig, get_config
 
 
 def chronological_split(
@@ -26,6 +27,41 @@ def chronological_split(
     test = df.iloc[validation_end:].copy()
 
     return train, validation, test
+
+
+def temporal_split(
+    df: pd.DataFrame,
+    train_fraction: float = 0.65,
+    calibration_fraction: float = 0.10,
+    validation_fraction: float = 0.10,
+):
+    ordered = df.sort_values("timestamp").reset_index(drop=True)
+    if train_fraction <= 0 or calibration_fraction <= 0 or validation_fraction <= 0:
+        raise ValueError("split fractions must be positive.")
+    if train_fraction + calibration_fraction + validation_fraction >= 1:
+        raise ValueError("split fractions must leave observations for test data.")
+
+    timestamps = ordered["timestamp"].drop_duplicates().sort_values().to_numpy()
+    timestamp_count = len(timestamps)
+    train_end = max(1, int(timestamp_count * train_fraction))
+    calibration_end = max(train_end + 1, int(timestamp_count * (train_fraction + calibration_fraction)))
+    validation_end = max(calibration_end + 1, int(timestamp_count * (train_fraction + calibration_fraction + validation_fraction)))
+    if validation_end >= timestamp_count:
+        raise ValueError("not enough distinct timestamps for four temporal periods.")
+
+    boundaries = timestamps[[train_end, calibration_end, validation_end]]
+    train = ordered[ordered["timestamp"] < boundaries[0]].copy()
+    calibration = ordered[
+        (ordered["timestamp"] >= boundaries[0])
+        & (ordered["timestamp"] < boundaries[1])
+    ].copy()
+    validation = ordered[
+        (ordered["timestamp"] >= boundaries[1])
+        & (ordered["timestamp"] < boundaries[2])
+    ].copy()
+    test = ordered[ordered["timestamp"] >= boundaries[2]].copy()
+
+    return train, calibration, validation, test
 
 TARGET = "Is_laundering"
 
@@ -123,7 +159,10 @@ ABLATION_FEATURE_SETS = {
 }
 
 
-def build_preprocessor(feature_names=MODEL_FEATURES):
+def build_preprocessor(feature_names=MODEL_FEATURES, config: TrainingConfig = None):
+    if config is None:
+        config = get_config()
+
     numeric_features = [
         feature for feature in feature_names
         if feature in NUMERIC_FEATURES
@@ -137,7 +176,7 @@ def build_preprocessor(feature_names=MODEL_FEATURES):
         steps=[
             (
                 "imputer",
-                SimpleImputer(strategy="median"),
+                SimpleImputer(strategy=config.preprocessing.numeric_impute_strategy),
             ),
         ]
     )
@@ -146,13 +185,13 @@ def build_preprocessor(feature_names=MODEL_FEATURES):
         steps=[
             (
                 "imputer",
-                SimpleImputer(strategy="most_frequent"),
+                SimpleImputer(strategy=config.preprocessing.categorical_impute_strategy),
             ),
             (
                 "onehot",
                 OneHotEncoder(
-                    handle_unknown="ignore",
-                    min_frequency=20,
+                    handle_unknown=config.preprocessing.categorical_handle_unknown,
+                    min_frequency=config.preprocessing.categorical_min_frequency,
                 ),
             ),
         ]
@@ -175,48 +214,41 @@ def build_preprocessor(feature_names=MODEL_FEATURES):
     )
 
 
-def build_xgboost_model(y_train):
+def build_xgboost_model(y_train, config: TrainingConfig = None):
+    if config is None:
+        config = get_config()
+
     positives = int(y_train.sum())
     negatives = len(y_train) - positives
 
     scale_pos_weight = negatives / max(positives, 1)
 
-    print(
-        "scale_pos_weight:",
-        round(scale_pos_weight, 2),
-    )
+    model_params = config.xgboost.to_dict()
+    model_params.update({
+        "objective": "binary:logistic",
+        "scale_pos_weight": scale_pos_weight,
+        "n_jobs": -1,
+    })
 
-    return xgb.XGBClassifier(
-        objective="binary:logistic",
-        n_estimators=500,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=5,
-        reg_alpha=0.1,
-        reg_lambda=2.0,
-        scale_pos_weight=scale_pos_weight,
-        eval_metric="aucpr",
-        tree_method="hist",
-        random_state=42,
-        n_jobs=-1,
-    )
+    return xgb.XGBClassifier(**model_params)
 
 
-def fit_model(train, validation, feature_names=MODEL_FEATURES):
+def fit_model(train, validation, feature_names=MODEL_FEATURES, config: TrainingConfig = None):
+    if config is None:
+        config = get_config()
+
     X_train = train[feature_names]
     y_train = train[TARGET]
 
     X_validation = validation[feature_names]
     y_validation = validation[TARGET]
 
-    preprocessor = build_preprocessor(feature_names)
+    preprocessor = build_preprocessor(feature_names, config=config)
 
     X_train_processed = preprocessor.fit_transform(X_train)
     X_validation_processed = preprocessor.transform(X_validation)
 
-    model = build_xgboost_model(y_train)
+    model = build_xgboost_model(y_train, config=config)
     model.fit(
         X_train_processed,
         y_train,
