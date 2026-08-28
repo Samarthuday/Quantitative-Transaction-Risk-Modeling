@@ -13,6 +13,11 @@ from sklearn.calibration import calibration_curve
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config import get_config
+from src.logging_config import setup_logging
+
+logger = setup_logging(__name__)
+
 from src.evaluation.metrics import (
     evaluate_model,
     top_k_alert_mask,
@@ -45,7 +50,7 @@ def print_split_stats(name, frame):
     positive = frame[TARGET].sum()
     prevalence = frame[TARGET].mean()
 
-    print(
+    logger.info(
         f"{name}: "
         f"{len(frame):,} rows | "
         f"{positive:,} suspicious | "
@@ -62,13 +67,20 @@ def main():
 
     args.artifact.parent.mkdir(parents=True, exist_ok=True)
 
-    print("Loading feature dataset...")
+    logger.info(f"Loading feature dataset from {args.features}...")
 
     df = pd.read_parquet(
         args.features
     )
+    logger.info(f"Loaded {len(df):,} transactions with {df.shape[1]} features")
 
+    logger.info("Performing temporal split (65% train / 10% calibration / 10% validation / 15% test)...")
     train, calibration, validation, test = temporal_split(df)
+
+    config = get_config(fast=args.fast)
+    if args.fast:
+        logger.info("Using FAST mode configuration")
+    logger.info(f"XGBoost config: n_estimators={config.xgboost.n_estimators}, max_depth={config.xgboost.max_depth}")
 
     print_split_stats(
         "TRAIN",
@@ -98,7 +110,7 @@ def main():
     ) = fit_model(
         train,
         calibration,
-        fast=args.fast,
+        config=config,
     )
 
     # ---------------------------
@@ -170,10 +182,8 @@ def main():
     )
     threshold = float(calibrated_validation_prob[calibration_alerts].min())
 
-    print(
-        f"\nThreshold for "
-        f"{alert_rate:.2%} alert rate: "
-        f"{threshold:.6f}"
+    logger.info(
+        f"Threshold for {alert_rate:.2%} alert rate: {threshold:.6f}"
     )
 
     # ---------------------------
@@ -230,25 +240,15 @@ def main():
             writer.writeheader()
             writer.writerows(typology_results)
 
-    print("\nOUT-OF-TIME TEST RESULTS")
-    print("=" * 50)
+    logger.info("OUT-OF-TIME TEST RESULTS:")
 
     for key, value in metrics.items():
-
         if isinstance(value, float):
-            print(
-                f"{key:30s}: "
-                f"{value:.6f}"
-            )
-
+            logger.info(f"  {key:30s}: {value:.6f}")
         else:
-            print(
-                f"{key:30s}: "
-                f"{value}"
-            )
+            logger.info(f"  {key:30s}: {value}")
 
-    # Benchmark the nonlinear model against a scalable logistic classifier on
-    # the exact same chronological partitions and preprocessing contract.
+    logger.info("Training logistic baseline for comparison...")
     baseline = build_logistic_baseline()
     baseline.fit(preprocessor.transform(train[MODEL_FEATURES]), train[TARGET])
     baseline_validation_prob = baseline.predict_proba(
@@ -263,10 +263,9 @@ def main():
     )
     baseline_metrics = evaluate_model(y_test, baseline_test_prob)
 
-    print("\nLOGISTIC BASELINE TEST RESULTS")
-    print("=" * 50)
+    logger.info("LOGISTIC BASELINE TEST RESULTS:")
     for key in ("pr_auc", "alert_0.500%_recall", "alert_0.500%_lift"):
-        print(f"{key:30s}: {baseline_metrics[key]:.6f}")
+        logger.info(f"  {key:30s}: {baseline_metrics[key]:.6f}")
 
     # ---------------------------
     # SAVE
@@ -306,13 +305,11 @@ def main():
         "model_version": "2.1.0",
     }
 
+    logger.info(f"Saving model artifact to {args.artifact}...")
     joblib.dump(artifact, args.artifact)
+    logger.info(f"Model saved successfully")
 
-    print(
-        "\nSaved model to "
-        f"{args.artifact.relative_to(PROJECT_ROOT)}"
-    )
-
+    logger.info(f"Writing metrics report...")
     report_path = PROJECT_ROOT / "reports/model_metrics.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report = {
@@ -324,6 +321,7 @@ def main():
         "calibration": calibration_report,
     }
     report_path.write_text(json.dumps(report, indent=2) + "\n")
+    logger.info(f"Metrics report written to {report_path.relative_to(PROJECT_ROOT)}")
 
 
 if __name__ == "__main__":

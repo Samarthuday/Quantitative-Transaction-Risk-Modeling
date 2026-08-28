@@ -11,9 +11,12 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 
+from marshmallow import ValidationError
+
+from src.api.schemas import validate_feature_vector
 from src.models.inference import (
     model_input_from_features,
     predict_calibrated_probability,
@@ -22,10 +25,11 @@ from src.models.inference import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MODEL_PATH = PROJECT_ROOT / "artifacts/risk_model.joblib"
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 
 def create_app(model_path: Path = MODEL_PATH) -> Flask:
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
     CORS(app)
 
     artifact: dict[str, Any] | None = None
@@ -36,6 +40,10 @@ def create_app(model_path: Path = MODEL_PATH) -> Flask:
         load_error = f"Model artifact not found at {model_path}. Train the offline model first."
     except Exception as error:  # pragma: no cover - defensive startup path
         load_error = f"Unable to load model artifact: {error}"
+
+    @app.get("/")
+    def dashboard():
+        return render_template("dashboard.html")
 
     @app.get("/api/health")
     def health():
@@ -66,11 +74,22 @@ def create_app(model_path: Path = MODEL_PATH) -> Flask:
     def predict():
         if artifact is None:
             return jsonify({"error": load_error}), 503
-        payload = request.get_json(silent=True)
+
+        try:
+            payload = request.get_json(force=True)
+        except Exception as error:
+            return jsonify({"error": f"Invalid JSON: {str(error)}"}), 400
+
         if not isinstance(payload, dict):
             return jsonify({"error": "Request body must be a JSON object."}), 400
+
         try:
-            features = model_input_from_features(payload, artifact["features"])
+            validated_features = validate_feature_vector(payload)
+        except ValidationError as error:
+            return jsonify({"error": error.messages}), 400
+
+        try:
+            features = model_input_from_features(validated_features, artifact["features"])
             probability = predict_calibrated_probability(artifact, features)
         except ValueError as error:
             return jsonify({"error": str(error)}), 400

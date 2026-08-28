@@ -8,10 +8,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
 
+from src.config import get_config
 from src.evaluation.metrics import (
     evaluate_model,
     precision_recall_at_alert_rate,
 )
+from src.logging_config import setup_logging
 from src.models.calibration import ProbabilityCalibrator
 from src.models.train import (
     ABLATION_FEATURE_SETS,
@@ -20,17 +22,21 @@ from src.models.train import (
     temporal_split,
 )
 
+logger = setup_logging(__name__)
+
 FEATURE_PATH = PROJECT_ROOT / "data/processed/transactions_features.parquet"
 ALERT_RATE = 0.005
 
 
-def evaluate_feature_set(name, features, train, calibration, validation, test, fast=False):
+def evaluate_feature_set(name, features, train, calibration, validation, test, config):
+    logger.info(f"Evaluating feature set: '{name}' ({len(features)} features)")
     (
         preprocessor,
         model,
         X_validation_processed,
         y_validation,
-    ) = fit_model(train, calibration, features, fast=fast)
+    ) = fit_model(train, calibration, features, config=config)
+    logger.debug(f"Model trained for '{name}'")
 
     validation_probabilities = model.predict_proba(
         X_validation_processed
@@ -71,9 +77,18 @@ def main():
     parser.add_argument("--fast", action="store_true")
     args = parser.parse_args()
 
+    logger.info(f"Loading feature dataset from {args.features}...")
     df = pd.read_parquet(args.features)
+    logger.info(f"Loaded {len(df):,} transactions")
+
+    logger.info("Performing temporal split...")
     train, calibration, validation, test = temporal_split(df)
 
+    config = get_config(fast=args.fast)
+    if args.fast:
+        logger.info("Using FAST mode configuration")
+
+    logger.info(f"Evaluating {len(ABLATION_FEATURE_SETS)} feature sets...")
     results = [
         evaluate_feature_set(
             name,
@@ -82,20 +97,16 @@ def main():
             calibration,
             validation,
             test,
-            args.fast,
+            config,
         )
         for name, features in ABLATION_FEATURE_SETS.items()
     ]
 
-    print("\nFEATURE ABLATION RESULTS")
-    print("=" * 55)
-    print(f"{'Model':<22} {'PR-AUC':>12} {'Recall@0.5%':>16}")
-    print("-" * 55)
+    logger.info("FEATURE ABLATION RESULTS:")
     for result in results:
-        print(
-            f"{result['model']:<22} "
-            f"{result['pr_auc']:>12.6f} "
-            f"{result['recall_at_0.5%']:>16.6f}"
+        logger.info(
+            f"  {result['model']:<22} PR-AUC: {result['pr_auc']:.6f} | "
+            f"Recall@0.5%: {result['recall_at_0.5%']:.6f}"
         )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -103,6 +114,8 @@ def main():
         writer = csv.DictWriter(handle, fieldnames=results[0].keys())
         writer.writeheader()
         writer.writerows(results)
+
+    logger.info(f"Ablation results written to {args.output.relative_to(PROJECT_ROOT)}")
 
 
 if __name__ == "__main__":
