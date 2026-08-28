@@ -1,7 +1,9 @@
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +26,14 @@ from src.models.baseline import build_logistic_baseline
 
 FEATURE_PATH = PROJECT_ROOT / "data/processed/transactions_features.parquet"
 ARTIFACT_PATH = PROJECT_ROOT / "artifacts/risk_model.joblib"
+
+
+def package_versions():
+    packages = ["numpy", "pandas", "scikit-learn", "xgboost", "duckdb", "joblib"]
+    return {
+        package: version(package)
+        for package in packages
+    }
 
 
 def print_split_stats(name, frame):
@@ -203,8 +213,21 @@ def main():
         "baseline_test_metrics": baseline_metrics,
         "validation_probability_quantiles": [
             float(value)
-            for value in sorted(calibrated_validation_prob)
+            for value in np.quantile(
+                calibrated_validation_prob,
+                np.linspace(0, 1, 1001),
+            )
         ],
+
+        "training_start": train["timestamp"].min().isoformat(),
+        "training_end": train["timestamp"].max().isoformat(),
+        "test_start": test["timestamp"].min().isoformat(),
+        "test_end": test["timestamp"].max().isoformat(),
+        "training_prevalence": float(train[TARGET].mean()),
+        "validation_prevalence": float(validation[TARGET].mean()),
+        "test_prevalence": float(test[TARGET].mean()),
+        "model_parameters": model.get_params(),
+        "package_versions": package_versions(),
 
         "model_version": "2.0.0",
     }

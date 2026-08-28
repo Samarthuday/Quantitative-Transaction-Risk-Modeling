@@ -1,267 +1,275 @@
-# 🚀 Real-Time Compliance Risk Monitoring System
+<div align="center">
 
-A comprehensive real-time financial transaction monitoring system with AI-powered risk assessment and live dashboard visualization.
+# Quantitative Transaction Risk Modeling
 
-## 📁 **Project Structure**
+**A research-grade framework for rare-event financial transaction surveillance using temporal, behavioral, and network signals.**
 
-```
-Automated-Compliance-Risk-Scoring/
-├── src/
-│   ├── api/
-│   │   └── simple_api_server.py      # Main API server (Flask)
-│   ├── dashboard/
-│   │   ├── real_time_dashboard.html  # Live monitoring dashboard
-│   │   └── serve_dashboard.py        # Dashboard HTTP server (port 8082)
-│   ├── utils/
-│   │   ├── simple_ingestion.py       # Transaction generator
-│   │   ├── start_system.py           # System startup script
-│   │   ├── test_ingestion.py         # Testing utility
-│   │   └── check_status.py           # Status checker
-│   ├── models/
-│   │   ├── best_model.pkl            # Trained XGBoost model
-│   │   └── model_metadata.pkl        # Model metadata
-│   ├── notebooks/
-│   │   ├── system.ipynb              # System analysis notebook
-│   │   └── Model.ipynb               # Model training notebook
-│   └── __init__.py
-├── start_system.py                    # Launcher script (runs API, generator, dashboard)
-├── requirements.txt                   # Python dependencies
-└── venv/                              # Virtual environment
-```
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-## 🎯 **System Components**
+`Python` · `XGBoost` · `scikit-learn` · `DuckDB` · `SHAP` · `Flask`
 
-### **1. API Server (`src/api/simple_api_server.py`)**
-- **Flask-based REST API** for transaction processing
-- **ML model integration** with XGBoost risk assessment
-- **Real-time monitoring** with statistics and alerts
-- **Health checks** and system status endpoints
-- **Feature engineering** with 18 engineered features
-- **Risk level classification** (MINIMAL, LOW, MEDIUM, HIGH)
+[Overview](#overview) •
+[Research Design](#research-design) •
+[Quick Start](#quick-start) •
+[API](#inference-api) •
+[Results](#results) •
+[Contributing](#contributing)
 
-### **2. Transaction Generator (`simple_ingestion.py`)**
-- **Synthetic transaction generation** for testing
-- **Realistic transaction patterns** with varying risk levels
-- **Continuous data flow** to simulate live environment
-- **Configurable generation rates** (2-5 second intervals)
-- **Multiple transaction types**: transfer, payment, investment, loan, refund
-- **Multi-currency support**: USD, EUR, GBP, JPY, CAD
-
-### **3. Live Dashboard (`real_time_dashboard.html`)**
-- **Real-time visualization** of transaction data
-- **Interactive charts** using Chart.js
-- **Risk distribution** with color-coded indicators
-- **Alert management** with filtering options
-- **Responsive design** for all devices
-- **Modern dark theme** with particle.js animations
-- **Live counters** and trend analysis
-
-### **4. Dashboard Server (`serve_dashboard.py`)**
-- **Local HTTP server** to serve the dashboard on port 8082
-- **CORS handling** for API communication
-- **Automatic browser opening**
-- **Simple file serving** with proper headers
-
-## 🚀 **Quick Start**
-
-### **Option 1: Automated Startup (Recommended)**
-```bash
-# Start the entire system with one command
-python start_system.py
-```
-
-This will:
-- ✅ Start the API server on port 5000
-- ✅ Start the transaction generator
-- ✅ Start the dashboard server on port 8082
-- ✅ Open the dashboard in your browser
-
-### **Option 2: Manual Startup**
-```bash
-# 1. Start the API server
-python src/api/simple_api_server.py
-
-# 2. In a new terminal, start the transaction generator
-python src/utils/simple_ingestion.py
-
-# 3. In a new terminal, start the dashboard server
-python src/dashboard/serve_dashboard.py
-```
-
-## 🌐 **Access Points**
-
-- **Dashboard**: http://localhost:8082/real_time_dashboard.html
-- **API Server**: http://localhost:5000
-- **Health Check**: http://localhost:5000/api/health
-- **API Documentation**: Available at runtime
-
-## 📊 **Dashboard Features**
-
-### **Real-Time Monitoring**
-- **Live transaction count** with processing rates
-- **Risk distribution** (High, Medium, Low, Minimal)
-- **System uptime** and health indicators
-- **Alert generation** statistics
-- **Processing rate** calculations
-
-### **Interactive Elements**
-- **Risk Grid** with animated counters
-- **Transaction trend chart** with real-time updates
-- **Alert filtering** with dropdown controls
-- **Manual refresh** button
-- **Responsive design** for mobile/desktop
-
-### **Visual Design**
-- **Modern dark theme** with gradient backgrounds
-- **Particle.js animations** for visual appeal
-- **Smooth transitions** and hover effects
-- **Professional color scheme** with risk-based coding
-- **Glassmorphism effects** with backdrop blur
-
-## 🔌 **API Endpoints**
-
-### **Health & Status**
-- `GET /api/health` - System health check
-- `GET /api/model/info` - ML model information
-
-### **Transaction Processing**
-- `POST /api/process_transaction` - Process individual transactions
-- `POST /api/bulk_process` - Process multiple transactions
-
-### **Monitoring & Analytics**
-- `GET /api/monitoring/stats` - Real-time statistics
-- `GET /api/monitoring/alerts` - Recent alerts
-- `GET /api/monitoring/high-risk` - High-risk transactions
-
-## 🤖 **ML Model Details**
-
-### **Model Information**
-- **Algorithm**: XGBoost with optimized parameters
-- **Threshold**: Configurable risk threshold
-- **Features**: 18 engineered features
-- **Performance**: Optimized for real-time processing
-
-### **Feature Engineering**
-- **Cyclic encoding** for time-based features
-- **Hashing** for categorical variables
-- **Log transformations** for numerical features
-- **Risk-based feature selection**
-- **Custom FeatureSelector class** for model compatibility
-
-## 🛠️ **Development & Testing**
-
-### **Testing Utilities**
-```bash
-# Test the ingestion system
-python src/utils/test_ingestion.py
-
-# Check system status
-python src/utils/check_status.py
-```
-
-### **Manual Testing**
-```bash
-# Test API health
-curl http://localhost:5000/api/health
-
-# Test transaction processing
-curl -X POST http://localhost:5000/api/process_transaction \
-  -H "Content-Type: application/json" \
-  -d '{"transaction_id": "test_001", "amount": 50000, "sender_id": "user1", "receiver_id": "user2", "transaction_type": "transfer", "payment_currency": "USD", "sender_bank_location": "US", "timestamp": "2025-01-13T16:00:00Z"}'
-```
-
-## 📈 **System Performance**
-
-### **Real-Time Capabilities**
-- **Sub-second response times** for transaction processing
-- **Live data updates** every 2-5 seconds
-- **Concurrent processing** of multiple transactions
-- **Memory-efficient** operations with in-memory storage
-
-### **Scalability Features**
-- **Modular architecture** for easy scaling
-- **Stateless API design** for load balancing
-- **Efficient data structures** for high throughput
-- **Configurable processing rates**
-
-## 🔧 **Configuration**
-
-### **Environment Variables**
-- `LOG_LEVEL` - Logging level (default: INFO)
-- `API_PORT` - API server port (default: 5000)
-
-Note: The dashboard server runs on a fixed port 8082.
-
-### **Customization Options**
-- **Transaction generation rates** in `src/utils/simple_ingestion.py`
-- **Dashboard refresh intervals** in `src/dashboard/real_time_dashboard.html`
-- **API timeout settings** in `src/api/simple_api_server.py`
-- **Visual themes** in dashboard CSS
-
-## 🚨 **Troubleshooting**
-
-### **Common Issues**
-
-1. **Port Already in Use**
-   ```bash
-   # Check what's using the port
-   netstat -ano | findstr :5000
-   # Kill the process or change the port
-   ```
-
-2. **Model Loading Errors**
-   ```bash
-   # Ensure model files exist
-   ls -la *.pkl
-   # Check file permissions
-   ```
-
-3. **Dashboard Not Loading**
-   ```bash
-   # Check if dashboard server is running
-   curl http://localhost:8082
-   # Verify CORS settings
-   ```
-
-### **Debug Mode**
-```bash
-# Enable debug logging
-export LOG_LEVEL=DEBUG
-python start_system.py
-```
-
-## 📚 **Documentation**
-
-- **System Architecture**: See `src/notebooks/system.ipynb`
-- **Model Training**: See `src/notebooks/Model.ipynb`
-- **API Documentation**: Available at runtime
-- **Code Comments**: Comprehensive inline documentation
-
-## 🤝 **Contributing**
-
-1. **Fork the repository**
-2. **Create a feature branch**
-3. **Make your changes**
-4. **Test thoroughly**
-5. **Submit a pull request**
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+</div>
 
 ---
 
+## Overview
 
-## 🧮 Risk Thresholds and Actions
+**Quantitative Transaction Risk Modeling** is an end-to-end framework for modeling rare suspicious activity in high-volume financial transaction data. It is built as a research artifact first and a production prototype second — every design choice is made to keep the evaluation honest under severe class imbalance and realistic operational constraints.
 
-The API converts model risk scores into levels using these thresholds:
+**Research question:**
 
-- MINIMAL: score < 0.20 → auto-approved
-- LOW: 0.20 ≤ score < 0.50 → auto-approved
-- MEDIUM: 0.50 ≤ score < 0.80 → review required
-- HIGH: score ≥ 0.80 → flagged and alert generated
+> Can historical transaction behavior, temporal dynamics, and network structure improve the identification of rare suspicious transactions under a constrained investigation budget?
 
-Additional flags applied during processing:
-- `large_amount` when amount > 100,000
-- `high_risk_score` when score > 0.80
-- `suspicious_pattern` when amount > 50,000 and score > 0.60
+The framework is validated on the **SAML-D** synthetic transaction dataset — approximately **9.5 million transactions** with a suspicious-event rate of roughly **0.1%** — and emphasizes:
+
+- Strict chronological development (no shuffling, no lookahead)
+- Leakage-aware historical feature construction
+- Probability calibration, not just raw model scores
+- Alert-budget–constrained decision thresholds
+- Out-of-time evaluation on a held-out future window
+- Reproducible, versioned inference artifacts
+
+## Why This Exists
+
+Most fraud/AML tutorials optimize ROC-AUC on a random train/test split and call it done. That approach silently leaks the future into the past and produces metrics that don't survive contact with a real compliance team, who can only investigate a fixed number of alerts per day. This project is an attempt to do it properly: chronological splits, calibrated probabilities, and evaluation metrics chosen because they hold up under a ~0.1% base rate and a fixed alert budget.
+
+## Research Design
+
+Transaction surveillance is treated as a **ranking and decision problem**, not a plain classification problem. For transaction $i$, the model estimates:
+
+$$
+P(Y_i = 1 \mid X_i)
+$$
+
+where $Y_i = 1$ denotes suspicious activity and $X_i$ contains only information available *before* the transaction occurs.
+
+```mermaid
+flowchart LR
+    A[SAML-D Transactions] --> B[Chronological Ordering]
+    B --> C[Transaction Features]
+    B --> D[Behavioral Features]
+    B --> E[Network Features]
+    C --> F[Leakage-Safe Preprocessing]
+    D --> F
+    E --> F
+    F --> G[Logistic Baseline]
+    F --> H[XGBoost]
+    H --> I[Probability Calibration]
+    I --> J[Alert-Budget Threshold]
+    J --> K[Out-of-Time Evaluation]
+    K --> L[Model Artifact]
+    L --> M[Inference API]
+```
+
+Historical variables use windows ending strictly before the current transaction. The dataset is split chronologically into **70% training**, **15% validation/calibration**, and **15% untouched out-of-time test** data — the test period is never seen during feature fitting, calibration, or threshold selection.
+
+## Feature Engineering
+
+| Group | Examples |
+| --- | --- |
+| **Transaction** | amount, log amount, cyclical time-of-day, weekend/night indicators, currency mismatch, geographic mismatch, round-amount flags |
+| **Behavioral** | rolling sender/receiver activity, currency-aware amount statistics, account-relative z-scores, time since previous sender transaction, historical sender–receiver interaction counts |
+| **Network** | historical transaction counts, unique counterparties, pair frequency, sender counterparty concentration |
+
+Network features treat accounts as nodes and transactions as directed edges. Counterparty concentration is measured with a Herfindahl–Hirschman-style index:
+
+$$
+HHI_i = \sum_j p_{ij}^{2}
+$$
+
+where $p_{ij}$ is the fraction of a sender's historical transfer value sent to counterparty $j$.
+
+## Modeling & Evaluation
+
+A regularized logistic classifier provides an interpretable linear benchmark. **XGBoost** is the primary nonlinear model, trained with class weighting to account for the rarity of the positive class.
+
+Because the event rate is ~0.1%, evaluation deliberately avoids metrics that look good by default under imbalance:
+
+| Metric | Purpose |
+| --- | --- |
+| PR-AUC | Rare-event ranking quality |
+| ROC-AUC | Overall discrimination |
+| Brier score | Probability calibration |
+| Log loss | Probabilistic accuracy |
+| Precision@K | Suspicious share within the alert budget |
+| Recall@K | Suspicious activity captured within the alert budget |
+| Lift@K | Concentration relative to the base rate |
+
+Feature-ablation experiments compare **transaction-only**, **transaction + behavioral**, **transaction + network**, and **full feature** sets on identical chronological partitions, so the marginal value of behavioral and network signal can be measured directly rather than assumed.
+
+## Results
+
+> Fill this section in with the numbers from your latest `reports/` run before publishing — reviewers look here first.
+
+| Feature Set | PR-AUC | Precision@1% | Recall@1% | Lift@1% |
+| --- | --- | --- | --- | --- |
+| Transaction-only | — | — | — | — |
+| + Behavioral | — | — | — | — |
+| + Network | — | — | — | — |
+| Full | — | — | — | — |
+
+## Repository Structure
+
+```text
+Quantitative-Transaction-Risk-Modeling/
+├── artifacts/              # Saved model artifacts (preprocessor, model, calibrator, metadata)
+├── data/                   # Raw and processed data (gitignored beyond samples)
+├── docs/assets/             # Diagrams, plots, and images used in documentation
+├── reports/                 # Evaluation reports and ablation results
+├── scripts/
+│   ├── build_features.py    # Chronological, leakage-safe feature construction
+│   ├── feature_ablation.py  # Transaction / behavioral / network ablation study
+│   └── train_model.py       # Training, calibration, threshold selection, evaluation
+├── src/
+│   ├── api/app.py           # Flask inference API
+│   ├── data/loader.py       # Raw data loading utilities
+│   ├── evaluation/           # Metrics and evaluation harness
+│   ├── features/              # Feature engineering modules
+│   └── models/                # Model wrappers and calibration logic
+├── tests/                    # Unit and integration tests
+├── README.md
+├── pyproject.toml
+└── requirements.txt
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.10+
+- ~4 GB free disk space for the SAML-D dataset and derived features
+
+### Installation
+
+```bash
+git clone https://github.com/<your-username>/Quantitative-Transaction-Risk-Modeling.git
+cd Quantitative-Transaction-Risk-Modeling
+
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### Run the pipeline
+
+Download the [SAML-D dataset](https://www.kaggle.com/datasets/berkanoztas/synthetic-transaction-monitoring-dataset-aml) and place it at `data/raw/SAML-D.csv`, then:
+
+```bash
+venv/bin/python scripts/build_features.py     # chronological, leakage-safe features
+venv/bin/python scripts/train_model.py        # train, calibrate, select threshold, evaluate
+venv/bin/python scripts/feature_ablation.py   # transaction vs. behavioral vs. network study
+venv/bin/python -m pytest -v                  # run the test suite
+```
+
+`train_model.py` fits preprocessing on the training period only, calibrates validation probabilities, selects an alert-budget threshold, evaluates the untouched out-of-time test period, benchmarks against the logistic baseline, and writes `artifacts/risk_model.joblib`.
+
+## Inference API
+
+The saved artifact bundles the preprocessor, XGBoost model, probability calibrator, feature contract, decision threshold, evaluation metrics, and reproducibility metadata into a single versioned object.
+
+```bash
+venv/bin/python -m src.api.app
+```
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/health` | Service and model health check |
+| `GET` | `/api/model/info` | Model metadata, feature contract, and evaluation metrics |
+| `POST` | `/api/predict` | Calibrated transaction-risk inference |
+
+<details>
+<summary><strong>Example request/response</strong></summary>
+
+```bash
+curl -X POST http://localhost:5000/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+        "amount": 15230.50,
+        "sender_id": "ACC-10245",
+        "receiver_id": "ACC-88213",
+        "currency": "USD",
+        "timestamp": "2026-08-28T14:32:00Z"
+      }'
+```
+
+```json
+{
+  "risk_score": 0.0421,
+  "flagged": false,
+  "threshold": 0.0387,
+  "model_version": "2026-08-01"
+}
+```
+
+</details>
+
+> **Note:** The API expects the engineered feature schema used during training. Historical behavioral variables must be supplied by an upstream feature store rather than reconstructed from a single raw transaction.
+
+## Reproducibility
+
+- Preprocessing is fitted using training observations only.
+- Historical windows exclude the current transaction (no lookahead).
+- Currency-specific amount statistics avoid mixing incomparable nominal values.
+- Final evaluation preserves natural rare-event prevalence — no oversampling of the test set.
+- Calibration and operational threshold selection are kept separate from final testing.
+- The saved artifact records training dates, class prevalence, model hyperparameters, package versions, and compact validation probability quantiles for drift monitoring.
+
+## Roadmap
+
+- [ ] Streaming/online feature computation for near-real-time scoring
+- [ ] Graph neural network baseline for the network-feature branch
+- [ ] Model card and datasheet for the released artifact
+- [ ] Dockerized inference service
+
+## Contributing
+
+Contributions are welcome. Please:
+
+1. Open an issue describing the change before large PRs.
+2. Run `pytest` and `black .` before submitting.
+3. Keep new features leakage-safe — anything derived from data must respect the chronological cutoff.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide.
+
+## Citation
+
+If you use this framework or the accompanying analysis, please cite:
+
+```bibtex
+@software{quant_transaction_risk_modeling,
+  title  = {Quantitative Transaction Risk Modeling},
+  author = {<Your Name>},
+  year   = {2026},
+  url    = {https://github.com/<your-username>/Quantitative-Transaction-Risk-Modeling}
+}
+```
+
+## Dataset Reference
+
+This project uses the **Synthetic Anti-Money Laundering Dataset (SAML-D)**:
+
+B. Oztas, D. Cetinkaya, F. Adedoyin, M. Budka, H. Dogan, and G. Aksu, "Enhancing Anti-Money Laundering: Development of a Synthetic Transaction Monitoring Dataset," *2023 IEEE International Conference on e-Business Engineering (ICEBE)*.
+
+## License
+
+Distributed under the [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+Built by [Your Name](https://github.com/<your-username>) — feedback and issues welcome.
+
+</div>
