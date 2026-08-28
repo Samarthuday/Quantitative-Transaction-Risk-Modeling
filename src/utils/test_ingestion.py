@@ -40,7 +40,7 @@ def test_ingestion():
         response = requests.post('http://localhost:5000/api/process_transaction', json=test_tx)
         if response.status_code == 200:
             result = response.json()
-            print(f"✅ Test Transaction Processed: Risk Score {result['risk_score']:.3f}")
+            print(f"✅ Test Transaction Processed: Risk Probability {result['risk_probability']:.3f}")
         else:
             print(f"❌ Test Transaction Failed: {response.status_code}")
             return

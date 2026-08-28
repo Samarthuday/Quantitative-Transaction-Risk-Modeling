@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""
-Simple Real-Time Transaction Generator
-Generates transactions continuously to demonstrate the system
+"""Demo Transaction Stream Simulator.
+
+This random generator is only for demonstrating legacy UI/infrastructure; it
+is not used for SAML-D model training, backtesting, or performance claims.
 """
 
 import requests
@@ -22,7 +23,7 @@ class SimpleTransactionGenerator:
         currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD']
         locations = ['US', 'UK', 'EU', 'JP', 'CA', 'AU', 'SG']
         
-        # Generate realistic transaction data
+        # Deliberately simple demo data, not realistic financial behaviour.
         amount = random.uniform(100, 1000000)
         transaction_type = random.choice(transaction_types)
         
@@ -60,7 +61,7 @@ class SimpleTransactionGenerator:
             if response.status_code == 200:
                 result = response.json()
                 self.transaction_count += 1
-                print(f"Transaction {self.transaction_count}: {transaction['transaction_id']} - Risk Score: {result['risk_score']:.3f} - Amount: ${transaction['amount']:,.2f}")
+                print(f"Transaction {self.transaction_count}: {transaction['transaction_id']} - Risk Probability: {result['risk_probability']:.3f} - Amount: ${transaction['amount']:,.2f}")
                 return True
             else:
                 print(f"Transaction failed: {response.status_code}")
@@ -72,7 +73,7 @@ class SimpleTransactionGenerator:
     
     def start_generation(self):
         """Start generating transactions continuously"""
-        print("Starting Simple Real-Time Transaction Generator...")
+        print("Starting Demo Transaction Stream Simulator...")
         print(f"API URL: {self.api_url}")
         print("Generating transactions every 2-5 seconds...")
         print("=" * 60)
@@ -110,7 +111,7 @@ class SimpleTransactionGenerator:
 def main():
     """Main function"""
     print("=" * 60)
-    print("SIMPLE REAL-TIME TRANSACTION GENERATOR")
+    print("DEMO TRANSACTION STREAM SIMULATOR")
     print("=" * 60)
     
     # Check if API is running
