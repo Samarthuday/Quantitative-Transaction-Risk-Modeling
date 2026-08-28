@@ -147,9 +147,8 @@ Quantitative-Transaction-Risk-Modeling/
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - ~4 GB free disk space for the SAML-D dataset and derived features
-
 ### Installation
 
 ```bash
