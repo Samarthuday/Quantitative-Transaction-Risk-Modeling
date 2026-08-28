@@ -1,9 +1,8 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from src.features.transaction_features import add_transaction_features
 from src.features.behavioral_features import add_behavioral_features
+from src.features.transaction_features import add_transaction_features
 
 
 def test_transaction_features_do_not_encode_account_ids():

@@ -11,26 +11,6 @@ from sklearn.metrics import (
 )
 
 
-def threshold_for_alert_rate(
-    probabilities: Union[np.ndarray, list],
-    alert_rate: float = 0.005,
-) -> float:
-    """
-    Alert only the top X% highest-risk transactions.
-    """
-
-    probabilities = np.asarray(probabilities, dtype=float)
-    if not 0 < alert_rate <= 1:
-        raise ValueError("alert_rate must be in (0, 1].")
-
-    return float(
-        np.quantile(
-            probabilities,
-            1 - alert_rate,
-        )
-    )
-
-
 def top_k_alert_mask(
     probabilities: Union[np.ndarray, list],
     alert_rate: float = 0.005,

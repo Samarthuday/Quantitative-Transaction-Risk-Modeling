@@ -1,8 +1,8 @@
 """Tests for data quality validation."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from src.data.validation import DataQualityValidator, validate_features
 from src.models.train import MODEL_FEATURES, TARGET

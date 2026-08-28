@@ -1,11 +1,10 @@
 """Tests for configuration management."""
 
-import pytest
 
 from src.config import (
-    XGBoostConfig,
     PreprocessingConfig,
     TrainingConfig,
+    XGBoostConfig,
     get_config,
     get_fast_config,
     get_production_config,

@@ -1,8 +1,9 @@
 """Data quality validation and checks."""
 
 import logging
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 from src.models.train import MODEL_FEATURES, TARGET
 

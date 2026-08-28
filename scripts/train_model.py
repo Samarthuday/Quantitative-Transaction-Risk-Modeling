@@ -307,9 +307,9 @@ def main():
 
     logger.info(f"Saving model artifact to {args.artifact}...")
     joblib.dump(artifact, args.artifact)
-    logger.info(f"Model saved successfully")
+    logger.info("Model saved successfully")
 
-    logger.info(f"Writing metrics report...")
+    logger.info("Writing metrics report...")
     report_path = PROJECT_ROOT / "reports/model_metrics.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report = {

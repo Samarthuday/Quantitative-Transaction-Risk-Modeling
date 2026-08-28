@@ -6,12 +6,27 @@ from pathlib import Path
 from typing import Any, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPORTS_DIR = PROJECT_ROOT / "reports"
+ASSETS_DIR = PROJECT_ROOT / "docs/assets"
+
+
+def _resolve_path(relative_name: str) -> Optional[Path]:
+    """Prefer a freshly generated report, fall back to the committed published copy."""
+    local_path = REPORTS_DIR / relative_name
+    if local_path.exists():
+        return local_path
+
+    fallback_path = ASSETS_DIR / relative_name
+    if fallback_path.exists():
+        return fallback_path
+
+    return None
 
 
 def load_ablation_results() -> list[dict[str, Any]]:
     """Load feature ablation study results from CSV."""
-    ablation_path = PROJECT_ROOT / "reports/ablation_results.csv"
-    if not ablation_path.exists():
+    ablation_path = _resolve_path("ablation_results.csv")
+    if ablation_path is None:
         return []
 
     results = []
@@ -28,8 +43,8 @@ def load_ablation_results() -> list[dict[str, Any]]:
 
 def load_typology_results() -> list[dict[str, Any]]:
     """Load behavioral typology analysis results from CSV."""
-    typology_path = PROJECT_ROOT / "reports/typology_results.csv"
-    if not typology_path.exists():
+    typology_path = _resolve_path("typology_results.csv")
+    if typology_path is None:
         return []
 
     results = []
@@ -46,12 +61,7 @@ def load_typology_results() -> list[dict[str, Any]]:
 
 
 def encode_all_figures() -> dict[str, str]:
-    """Load all report figures from reports/figures/*.png and encode to base64."""
-    figures_dir = PROJECT_ROOT / "reports/figures"
-    if not figures_dir.exists():
-        return {}
-
-    figures = {}
+    """Load report figures, preferring freshly generated ones over the committed fallback."""
     figure_mapping = {
         "calibration_curve": "Calibration Curve",
         "roc_curve": "ROC Curve",
@@ -61,8 +71,16 @@ def encode_all_figures() -> dict[str, str]:
         "typology_detection": "Typology Detection",
     }
 
-    for png_path in sorted(figures_dir.glob("*.png")):
-        stem = png_path.stem
+    # Fallback pass first so freshly generated figures (below) take precedence.
+    png_paths: dict[str, Path] = {}
+    for directory in (ASSETS_DIR, REPORTS_DIR / "figures"):
+        if not directory.exists():
+            continue
+        for png_path in directory.glob("*.png"):
+            png_paths[png_path.stem] = png_path
+
+    figures = {}
+    for stem, png_path in sorted(png_paths.items()):
         with png_path.open("rb") as f:
             image_bytes = f.read()
         base64_str = base64.b64encode(image_bytes).decode("utf-8")

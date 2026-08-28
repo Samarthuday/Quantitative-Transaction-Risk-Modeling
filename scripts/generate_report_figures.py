@@ -6,15 +6,13 @@ from pathlib import Path
 
 import joblib
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_curve, precision_recall_curve, auc
+from sklearn.metrics import auc, precision_recall_curve, roc_curve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.logging_config import setup_logging
-from src.models.calibration import ProbabilityCalibrator
 from src.models.train import MODEL_FEATURES, TARGET, temporal_split
 
 logger = setup_logging(__name__)

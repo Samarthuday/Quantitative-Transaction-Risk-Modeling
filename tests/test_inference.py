@@ -1,11 +1,10 @@
-import asyncio
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.main import create_app
 from src.api.inference import model_input_from_features
+from src.api.main import create_app
 
 
 @pytest.mark.asyncio
