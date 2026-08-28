@@ -227,7 +227,7 @@ def process_transaction():
         if risk_level == 'HIGH':
             high_risk_transactions.append({
                 'transaction_id': data['transaction_id'],
-                'risk_score': risk_score,
+                'risk_probability': risk_score,
                 'risk_level': risk_level,
                 'amount': data['amount'],
                 'sender_id': data['sender_id'],
@@ -241,7 +241,7 @@ def process_transaction():
                 'type': 'HIGH_RISK_TRANSACTION',
                 'severity': 'HIGH',
                 'message': f'High risk transaction detected: {data["transaction_id"]}',
-                'risk_score': risk_score,
+                'risk_probability': risk_score,
                 'amount': data['amount'],
                 'sender': data['sender_id'],
                 'receiver': data['receiver_id'],
@@ -252,12 +252,11 @@ def process_transaction():
         
         return jsonify({
             'transaction_id': data['transaction_id'],
-            'risk_score': risk_score,
+            'risk_probability': risk_score,
             'risk_level': risk_level,
             'compliance_status': 'PENDING' if requires_review else 'APPROVED',
             'requires_review': requires_review,
             'flagged_features': flagged_features,
-            'confidence': abs(risk_score - 0.5) * 2,  # Simple confidence calculation
             'processed_at': datetime.now().isoformat()
         })
         
@@ -342,12 +341,11 @@ def bulk_process_transactions():
                 
                 results.append({
                     'transaction_id': tx_data['transaction_id'],
-                    'risk_score': risk_score,
+                    'risk_probability': risk_score,
                     'risk_level': risk_level,
                     'compliance_status': 'PENDING' if requires_review else 'APPROVED',
                     'requires_review': requires_review,
                     'flagged_features': flagged_features,
-                    'confidence': abs(risk_score - 0.5) * 2,
                     'processed_at': datetime.now().isoformat()
                 })
                 
