@@ -86,6 +86,42 @@ def precision_recall_at_alert_rate(
     }
 
 
+def metrics_at_threshold(
+    y_true: Union[np.ndarray, list],
+    probabilities: Union[np.ndarray, list],
+    threshold: float,
+) -> Dict[str, float]:
+    """Precision/recall/lift/alert-rate for a fixed probability threshold.
+
+    Unlike precision_recall_at_alert_rate (which selects the top-K for each
+    population independently), this applies one threshold decided elsewhere
+    (e.g. the artifact's production decision_threshold) -- the question is
+    "what does the existing policy do to this subgroup," not "what is the
+    best top-K for this subgroup."
+    """
+    y_true = np.asarray(y_true)
+    probabilities = np.asarray(probabilities)
+    predicted = probabilities >= threshold
+
+    tp = np.sum((predicted == 1) & (y_true == 1))
+    fp = np.sum((predicted == 1) & (y_true == 0))
+    fn = np.sum((predicted == 0) & (y_true == 1))
+
+    precision = tp / (tp + fp) if tp + fp > 0 else 0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0
+    base_rate = y_true.mean()
+    lift = precision / base_rate if base_rate > 0 else 0
+
+    return {
+        "threshold": float(threshold),
+        "precision": float(precision),
+        "recall": float(recall),
+        "lift": float(lift),
+        "alert_rate": float(predicted.mean()),
+        "alerts": int(predicted.sum()),
+    }
+
+
 def expected_decision_cost(
     y_true: Union[np.ndarray, list],
     probabilities: Union[np.ndarray, list],

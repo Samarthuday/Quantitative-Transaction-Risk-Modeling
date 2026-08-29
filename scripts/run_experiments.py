@@ -17,6 +17,11 @@ def main():
     parser.add_argument("--features", type=Path, default=PROJECT_ROOT / "data/processed/transactions_features.parquet")
     parser.add_argument("--artifact", type=Path, default=PROJECT_ROOT / "artifacts/risk_model.joblib")
     parser.add_argument("--fast", action="store_true")
+    parser.add_argument(
+        "--generalization",
+        action="store_true",
+        help="Also run the unseen-entity generalization experiment (research extension, not part of the core workflow).",
+    )
     args = parser.parse_args()
     python = sys.executable
 
@@ -31,6 +36,10 @@ def main():
     run(train)
     run(ablation)
     run(walk_forward)
+    run([python, "scripts/generate_report_figures.py", "--features", str(args.features), "--artifact", str(args.artifact)])
+
+    if args.generalization:
+        run([python, "scripts/unseen_entity_evaluation.py", "--features", str(args.features), "--artifact", str(args.artifact)])
 
 
 if __name__ == "__main__":

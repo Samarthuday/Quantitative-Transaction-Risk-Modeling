@@ -7,6 +7,7 @@ No retraining: reuses the artifact trained on the standard temporal split
 and evaluates it on three partitions of the same held-out test set.
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -19,7 +20,11 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.evaluation.metrics import evaluate_model, precision_recall_at_alert_rate
+from src.evaluation.metrics import (
+    evaluate_model,
+    metrics_at_threshold,
+    precision_recall_at_alert_rate,
+)
 from src.logging_config import setup_logging
 from src.models.train import MODEL_FEATURES, TARGET, temporal_split
 
@@ -30,6 +35,19 @@ FEATURE_PATH = PROJECT_ROOT / "data/processed/transactions_features.parquet"
 OUTPUT_PATH = PROJECT_ROOT / "reports/unseen_entity_results.json"
 FIGURE_PATH = PROJECT_ROOT / "reports/figures/unseen_entity_generalization.png"
 ALERT_RATE = 0.005
+
+
+def summarize_fixed_threshold(
+    mask: np.ndarray, y_test: np.ndarray, calibrated_prob: np.ndarray, threshold: float, label: str
+) -> dict:
+    """What the artifact's actual production threshold does to this subgroup,
+    as opposed to summarize()'s per-subgroup top-K (best ranking within the
+    subgroup alone)."""
+    subset_y = y_test[mask]
+    subset_prob = calibrated_prob[mask]
+    if len(subset_y) == 0:
+        return {"label": label, "metrics": None}
+    return {"label": label, "metrics": metrics_at_threshold(subset_y, subset_prob, threshold)}
 
 
 def summarize(mask: np.ndarray, y_test: np.ndarray, calibrated_prob: np.ndarray, label: str) -> dict:
@@ -65,14 +83,19 @@ def summarize(mask: np.ndarray, y_test: np.ndarray, calibrated_prob: np.ndarray,
 
 
 def main():
-    logger.info(f"Loading artifact from {ARTIFACT_PATH}...")
-    artifact = joblib.load(ARTIFACT_PATH)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--features", type=Path, default=FEATURE_PATH)
+    parser.add_argument("--artifact", type=Path, default=ARTIFACT_PATH)
+    args = parser.parse_args()
+
+    logger.info(f"Loading artifact from {args.artifact}...")
+    artifact = joblib.load(args.artifact)
     preprocessor = artifact["preprocessor"]
     model = artifact["model"]
     calibrator = artifact["calibrator"]
 
-    logger.info(f"Loading features from {FEATURE_PATH}...")
-    df = pd.read_parquet(FEATURE_PATH)
+    logger.info(f"Loading features from {args.features}...")
+    df = pd.read_parquet(args.features)
 
     train, _, _, test = temporal_split(df)
 
@@ -99,22 +122,44 @@ def main():
     seen_result = summarize(both_seen, y_test, calibrated_prob, "Both sender and receiver seen during training")
     unseen_result = summarize(unseen_entity, y_test, calibrated_prob, "At least one party unseen during training")
 
+    decision_threshold = artifact["decision_threshold"]
+    fixed_threshold_seen = summarize_fixed_threshold(
+        both_seen, y_test, calibrated_prob, decision_threshold, "Both parties seen"
+    )
+    fixed_threshold_unseen = summarize_fixed_threshold(
+        unseen_entity, y_test, calibrated_prob, decision_threshold, "Unseen entity"
+    )
+
     results = {
         "alert_rate": ALERT_RATE,
         "accounts_seen_in_training": len(seen_accounts),
         "standard_out_of_time": standard,
         "both_parties_seen": seen_result,
         "unseen_entity": unseen_result,
+        "fixed_production_threshold": {
+            "decision_threshold": decision_threshold,
+            "both_parties_seen": fixed_threshold_seen,
+            "unseen_entity": fixed_threshold_unseen,
+        },
     }
 
     logger.info("=" * 70)
-    logger.info("UNSEEN-ENTITY GENERALIZATION RESULTS")
+    logger.info("UNSEEN-ENTITY GENERALIZATION RESULTS (per-subgroup top-K)")
     logger.info("=" * 70)
     for key in ("standard_out_of_time", "both_parties_seen", "unseen_entity"):
         r = results[key]
         logger.info(f"\n{r['label']}:")
         prevalence = f"{r['prevalence']:.4%}" if r["prevalence"] is not None else "n/a"
         logger.info(f"  Transactions: {r['transactions']:,} | Positives: {r['positives']:,} | Prevalence: {prevalence}")
+        if r["metrics"]:
+            for metric_key, value in r["metrics"].items():
+                logger.info(f"  {metric_key:30s}: {value:.6f}")
+
+    logger.info("=" * 70)
+    logger.info(f"SAME FIXED PRODUCTION THRESHOLD ({decision_threshold:.6f}) APPLIED TO BOTH SUBGROUPS")
+    logger.info("=" * 70)
+    for r in (fixed_threshold_seen, fixed_threshold_unseen):
+        logger.info(f"\n{r['label']}:")
         if r["metrics"]:
             for metric_key, value in r["metrics"].items():
                 logger.info(f"  {metric_key:30s}: {value:.6f}")

@@ -3,6 +3,7 @@ import csv
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -17,31 +18,55 @@ from src.models.train import MODEL_FEATURES, TARGET, fit_model
 logger = setup_logging(__name__)
 
 
-def run_backtest(frame, config):
-    logger.info(f"Starting walk-forward backtest on {len(frame):,} transactions")
-    ordered = frame.sort_values("timestamp").reset_index(drop=True)
-    timestamps = ordered["timestamp"].drop_duplicates().sort_values().tolist()
-    block_count = 14
-    if len(timestamps) < block_count:
-        raise ValueError("walk-forward backtesting requires at least 14 unique timestamps")
+def window_boundaries(timestamps, block_count=14, window_count=4):
+    """Expanding-window (train/calibration/test) cutoffs spanning the full timestamp range.
 
-    logger.info(f"Found {len(timestamps)} unique timestamps, creating rolling windows...")
-    results = []
-    for window in range(4):
+    Splits the full range into `block_count` contiguous chronological blocks and
+    walks 4 expanding windows across them, each cutoff being the first timestamp
+    of its block. The last window's test cutoff is None (extends to the end).
+    """
+    timestamps = np.asarray(timestamps)
+    if len(timestamps) < block_count:
+        raise ValueError(f"requires at least {block_count} unique timestamps")
+
+    blocks = np.array_split(timestamps, block_count)
+    block_starts = [block[0] for block in blocks]
+
+    boundaries = []
+    for window in range(window_count):
         train_end = 4 + window * 2
         calibration_end = train_end + 2
         test_end = calibration_end + 2
-        if test_end > len(timestamps):
+        if test_end > block_count:
             continue
-        train = ordered[ordered["timestamp"] < timestamps[train_end]]
+        train_cutoff = block_starts[train_end]
+        calibration_cutoff = block_starts[calibration_end]
+        test_cutoff = block_starts[test_end] if test_end < block_count else None
+        boundaries.append((train_cutoff, calibration_cutoff, test_cutoff))
+    return boundaries
+
+
+def run_backtest(frame, config):
+    logger.info(f"Starting walk-forward backtest on {len(frame):,} transactions")
+    ordered = frame.sort_values("timestamp").reset_index(drop=True)
+    timestamps = ordered["timestamp"].drop_duplicates().sort_values().to_numpy()
+    boundaries = window_boundaries(timestamps)
+
+    logger.info(f"Found {len(timestamps)} unique timestamps, creating rolling windows...")
+    results = []
+    for window, (train_cutoff, calibration_cutoff, test_cutoff) in enumerate(boundaries):
+        train = ordered[ordered["timestamp"] < train_cutoff]
         calibration = ordered[
-            (ordered["timestamp"] >= timestamps[train_end])
-            & (ordered["timestamp"] < timestamps[calibration_end])
+            (ordered["timestamp"] >= train_cutoff)
+            & (ordered["timestamp"] < calibration_cutoff)
         ]
-        test = ordered[
-            (ordered["timestamp"] >= timestamps[calibration_end])
-            & (ordered["timestamp"] < timestamps[test_end])
-        ]
+        if test_cutoff is not None:
+            test = ordered[
+                (ordered["timestamp"] >= calibration_cutoff)
+                & (ordered["timestamp"] < test_cutoff)
+            ]
+        else:
+            test = ordered[ordered["timestamp"] >= calibration_cutoff]
         if calibration[TARGET].nunique() < 2:
             logger.debug(f"Window {window + 1}: Skipping (insufficient target variance in calibration)")
             continue

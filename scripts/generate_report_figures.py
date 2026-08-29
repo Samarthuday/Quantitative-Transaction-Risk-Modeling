@@ -1,5 +1,6 @@
 """Generate report figures (ROC, PR, feature importance, ablation, typology) from existing artifacts."""
 
+import argparse
 import csv
 import sys
 from pathlib import Path
@@ -25,16 +26,21 @@ TYPOLOGY_PATH = PROJECT_ROOT / "reports/typology_results.csv"
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--features", type=Path, default=FEATURE_PATH)
+    parser.add_argument("--artifact", type=Path, default=ARTIFACT_PATH)
+    args = parser.parse_args()
+
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Loading artifact from {ARTIFACT_PATH}...")
-    artifact = joblib.load(ARTIFACT_PATH)
+    logger.info(f"Loading artifact from {args.artifact}...")
+    artifact = joblib.load(args.artifact)
     preprocessor = artifact["preprocessor"]
     model = artifact["model"]
     calibrator = artifact["calibrator"]
 
-    logger.info(f"Loading features from {FEATURE_PATH}...")
-    df = pd.read_parquet(FEATURE_PATH)
+    logger.info(f"Loading features from {args.features}...")
+    df = pd.read_parquet(args.features)
 
     logger.info("Performing temporal split to recover test set...")
     _, _, _, test = temporal_split(df)

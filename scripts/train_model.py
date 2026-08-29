@@ -105,8 +105,8 @@ def main():
     (
         preprocessor,
         model,
-        X_validation_processed,
-        y_validation,
+        X_calibration_processed,
+        y_calibration,
     ) = fit_model(
         train,
         calibration,
@@ -114,12 +114,12 @@ def main():
     )
 
     # ---------------------------
-    # CALIBRATION
+    # CALIBRATION (fit calibrator on the calibration split)
     # ---------------------------
 
     raw_calibration_prob = (
         model.predict_proba(
-            X_validation_processed
+            X_calibration_processed
         )[:, 1]
     )
 
@@ -127,22 +127,28 @@ def main():
 
     calibrator.fit(
         raw_calibration_prob,
-        y_validation,
+        y_calibration,
     )
 
-    calibrated_validation_prob = (
-        calibrator.predict(raw_calibration_prob)
-    )
+    # ---------------------------
+    # VALIDATION (independent set: calibration quality check + threshold selection)
+    # ---------------------------
+
+    X_validation_processed = preprocessor.transform(validation[MODEL_FEATURES])
+    y_validation = validation[TARGET]
+
+    raw_validation_prob = model.predict_proba(X_validation_processed)[:, 1]
+    calibrated_validation_prob = calibrator.predict(raw_validation_prob)
 
     calibration_report = {
         "raw_brier_score": float(
-            evaluate_model(y_validation, raw_calibration_prob)["brier_score"]
+            evaluate_model(y_validation, raw_validation_prob)["brier_score"]
         ),
         "calibrated_brier_score": float(
             evaluate_model(y_validation, calibrated_validation_prob)["brier_score"]
         ),
         "raw_log_loss": float(
-            evaluate_model(y_validation, raw_calibration_prob)["log_loss"]
+            evaluate_model(y_validation, raw_validation_prob)["log_loss"]
         ),
         "calibrated_log_loss": float(
             evaluate_model(y_validation, calibrated_validation_prob)["log_loss"]
@@ -154,7 +160,7 @@ def main():
 
     figure, axis = plt.subplots(figsize=(6, 6))
     for probabilities, label in (
-        (raw_calibration_prob, "Raw XGBoost"),
+        (raw_validation_prob, "Raw XGBoost"),
         (calibrated_validation_prob, "Calibrated XGBoost"),
     ):
         observed, predicted = calibration_curve(
@@ -176,11 +182,11 @@ def main():
     # Use a realistic operational alert capacity
     alert_rate = 0.005
 
-    calibration_alerts = top_k_alert_mask(
+    validation_alerts = top_k_alert_mask(
         calibrated_validation_prob,
         alert_rate,
     )
-    threshold = float(calibrated_validation_prob[calibration_alerts].min())
+    threshold = float(calibrated_validation_prob[validation_alerts].min())
 
     logger.info(
         f"Threshold for {alert_rate:.2%} alert rate: {threshold:.6f}"
@@ -251,12 +257,12 @@ def main():
     logger.info("Training logistic baseline for comparison...")
     baseline = build_logistic_baseline()
     baseline.fit(preprocessor.transform(train[MODEL_FEATURES]), train[TARGET])
-    baseline_validation_prob = baseline.predict_proba(
-        X_validation_processed
+    baseline_calibration_prob = baseline.predict_proba(
+        X_calibration_processed
     )[:, 1]
     baseline_calibrator = ProbabilityCalibrator().fit(
-        baseline_validation_prob,
-        y_validation,
+        baseline_calibration_prob,
+        y_calibration,
     )
     baseline_test_prob = baseline_calibrator.predict(
         baseline.predict_proba(X_test_processed)[:, 1]
