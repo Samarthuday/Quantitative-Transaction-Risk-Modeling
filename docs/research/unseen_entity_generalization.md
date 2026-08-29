@@ -63,6 +63,27 @@ synthetic dataset. That is a plausible property of real laundering rings too
 "the model doesn't know what to do with new accounts" from "new accounts are
 inherently rarer positives here."
 
+## Under the actual production threshold
+
+The table above gives each subgroup its own top-K -- the best possible
+ranking within that population alone. That answers "how good is ranking
+within this population," not "what happens to unseen accounts under the
+policy actually deployed." Applying the artifact's single fixed
+`decision_threshold` (0.001160, chosen on the validation split) to both
+subgroups instead:
+
+| Population | Alert rate | Precision | Recall | Lift |
+|---|---:|---:|---:|---:|
+| Both parties seen | 0.549% | 39.58% | 99.30% | 180.8x |
+| Unseen entity | 0.501% | 3.51% | 99.20% | 197.9x |
+
+One threshold, applied identically to both, lands each subgroup within noise
+of its own 0.5% alert budget on its own -- the calibration transfers across
+subgroups even though it was never tuned per-subgroup. Recall is
+indistinguishable (99.3% vs 99.2%). Precision differs by 11x, entirely
+consistent with the 12x prevalence gap between the two populations, not a
+sign the threshold behaves differently for unseen accounts.
+
 ## What this doesn't test
 
 Network features (out-degree, counterparty HHI) are computed per-transaction

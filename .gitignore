@@ -45,3 +45,4 @@ htmlcov/
 
 # Large data
 *.csv
+!docs/assets/*.csv
