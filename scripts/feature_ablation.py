@@ -28,23 +28,23 @@ FEATURE_PATH = PROJECT_ROOT / "data/processed/transactions_features.parquet"
 ALERT_RATE = 0.005
 
 
-def evaluate_feature_set(name, features, train, calibration, validation, test, config):
+def evaluate_feature_set(name, features, train, calibration, test, config):
     logger.info(f"Evaluating feature set: '{name}' ({len(features)} features)")
     (
         preprocessor,
         model,
-        X_validation_processed,
-        y_validation,
+        X_calibration_processed,
+        y_calibration,
     ) = fit_model(train, calibration, features, config=config)
     logger.debug(f"Model trained for '{name}'")
 
-    validation_probabilities = model.predict_proba(
-        X_validation_processed
+    calibration_probabilities = model.predict_proba(
+        X_calibration_processed
     )[:, 1]
 
     calibrator = ProbabilityCalibrator().fit(
-        validation_probabilities,
-        y_validation,
+        calibration_probabilities,
+        y_calibration,
     )
 
     test_probabilities = calibrator.predict(
@@ -82,7 +82,7 @@ def main():
     logger.info(f"Loaded {len(df):,} transactions")
 
     logger.info("Performing temporal split...")
-    train, calibration, validation, test = temporal_split(df)
+    train, calibration, _validation, test = temporal_split(df)
 
     config = get_config(fast=args.fast)
     if args.fast:
@@ -95,7 +95,6 @@ def main():
             features,
             train,
             calibration,
-            validation,
             test,
             config,
         )
