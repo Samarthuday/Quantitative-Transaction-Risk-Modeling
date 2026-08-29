@@ -94,6 +94,24 @@ The model detects specific money-laundering patterns with high recall:
 - **98%+ detection**: Behavioural Change, Cycle, Deposit-Send, Scatter-Gather, Gather-Scatter, Stacked Bipartite, Single Large
 - **Limitations**: Over-Invoicing (86% recall) detected less reliably due to low transaction prevalence
 
+### Temporal Stability
+
+Walk-forward backtesting splits the full timeline into 14 chronological blocks
+and evaluates 4 expanding out-of-time windows (train grows, calibration/test
+roll forward each time):
+
+| Window | PR-AUC | Precision @ 0.5% | Recall @ 0.5% | Lift @ 0.5% |
+|---|---:|---:|---:|---:|
+| W1 | 0.9379 | 18.39% | 97.05% | 194.1x |
+| W2 | 0.9658 | 21.61% | 98.19% | 196.4x |
+| W3 | 0.9774 | 20.54% | 99.08% | 198.1x |
+| W4 | 0.9901 | 23.49% | 99.38% | 198.7x |
+
+Performance is stable-to-improving across expanding out-of-time windows, not
+just in the single held-out test split — later windows benefit from more
+accumulated transaction history for the network features (degree, lifetime
+counts, counterparty concentration).
+
 ### Analysis Visualizations
 
 ![ROC Curve](docs/assets/roc_curve.png)

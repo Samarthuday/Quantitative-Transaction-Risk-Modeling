@@ -33,9 +33,9 @@
   "training_prevalence": 0.001003416857597292,
   "test_prevalence": 0.0011921912179000402,
   "calibration": {
-    "raw_brier_score": 0.0016988252755254507,
-    "calibrated_brier_score": 4.299887950764969e-05,
-    "raw_log_loss": 0.006217300426214933,
-    "calibrated_log_loss": 0.0002347317640669644
+    "raw_brier_score": 0.0016964440001174808,
+    "calibrated_brier_score": 7.803709740983322e-05,
+    "raw_log_loss": 0.006314944475889206,
+    "calibrated_log_loss": 0.00040054231067188084
   }
 }
