@@ -243,6 +243,7 @@ curl -X POST http://localhost:8000/api/predict \
 - Calibration may drift under distribution shift.
 - Risk probabilities are model estimates, not financial-loss probabilities.
 - The online feature-store layer is outside the current research scope.
+- Network features are strong (see ablation), which raises the question of whether they transfer to accounts absent from training. See [Unseen-Entity Generalization](docs/research/unseen_entity_generalization.md) for a dedicated experiment on this.
 
 ## Dataset Reference
 

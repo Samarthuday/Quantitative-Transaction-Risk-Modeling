@@ -1,0 +1,43 @@
+{
+  "alert_rate": 0.005,
+  "accounts_seen_in_training": 693879,
+  "standard_out_of_time": {
+    "label": "Standard out-of-time (full test set)",
+    "transactions": 1420913,
+    "positives": 1694,
+    "prevalence": 0.0011921912179000402,
+    "metrics": {
+      "pr_auc": 0.9859286355765932,
+      "roc_auc": 0.9998338278230887,
+      "precision_at_alert_rate": 0.23673469387755103,
+      "recall_at_alert_rate": 0.9929161747343566,
+      "lift_at_alert_rate": 198.5710767896297
+    }
+  },
+  "both_parties_seen": {
+    "label": "Both sender and receiver seen during training",
+    "transactions": 716838,
+    "positives": 1569,
+    "prevalence": 0.002188779054681811,
+    "metrics": {
+      "pr_auc": 0.9917797464630843,
+      "roc_auc": 0.9998019722862765,
+      "precision_at_alert_rate": 0.4345885634588563,
+      "recall_at_alert_rate": 0.992989165073295,
+      "lift_at_alert_rate": 198.55296153774358
+    }
+  },
+  "unseen_entity": {
+    "label": "At least one party unseen during training",
+    "transactions": 704075,
+    "positives": 125,
+    "prevalence": 0.00017753790434257713,
+    "metrics": {
+      "pr_auc": 0.7912056121187283,
+      "roc_auc": 0.9997998835144541,
+      "precision_at_alert_rate": 0.03521726782164158,
+      "recall_at_alert_rate": 0.992,
+      "lift_at_alert_rate": 198.36478273217836
+    }
+  }
+}
